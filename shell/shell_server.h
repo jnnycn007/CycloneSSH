@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.0
+ * @version 2.6.2
  **/
 
 #ifndef _SHELL_SERVER_H
@@ -271,6 +271,9 @@ error_t shellServerWriteStream(ShellServerSession *session, const void *data,
 
 error_t shellServerReadStream(ShellServerSession *session, void *data,
    size_t size, size_t *received, uint_t flags);
+
+error_t shellServerSetExitStatus(ShellServerSession *session,
+   int32_t exitStatus);
 
 error_t shellServerSaveHistory(ShellServerSession *session, char_t *history,
    size_t size, size_t *length);

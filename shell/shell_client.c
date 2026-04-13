@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.0
+ * @version 2.6.2
  **/
 
 //Switch to the appropriate trace level
@@ -67,6 +67,8 @@ error_t shellClientInit(ShellClientContext *context)
    context->state = SHELL_CLIENT_STATE_DISCONNECTED;
    //Default timeout
    context->timeout = SHELL_CLIENT_DEFAULT_TIMEOUT;
+   //Initialize exit status
+   context->exitStatus = -1;
 
    //Successful processing
    return NO_ERROR;
@@ -342,6 +344,8 @@ error_t shellClientExecuteCommand(ShellClientContext *context,
       //Check the state of the shell client
       if(context->state == SHELL_CLIENT_STATE_CONNECTED)
       {
+         //Initialize exit status
+         context->exitStatus = -1;
          //Update shell client state
          shellClientChangeState(context, SHELL_CLIENT_STATE_CHANNEL_INIT);
       }
@@ -375,6 +379,7 @@ error_t shellClientExecuteCommand(ShellClientContext *context,
          {
             //Update shell client state
             shellClientChangeState(context, SHELL_CLIENT_STATE_CONNECTED);
+
             //Report an error
             error = ERROR_OPEN_FAILED;
          }
@@ -403,6 +408,7 @@ error_t shellClientExecuteCommand(ShellClientContext *context,
                sshDeleteChannel(&context->sshChannel);
                //Update shell client state
                shellClientChangeState(context, SHELL_CLIENT_STATE_CONNECTED);
+
                //An SSH_MSG_CHANNEL_OPEN_FAILURE message has been received
                error = ERROR_OPEN_FAILED;
             }
@@ -484,6 +490,7 @@ error_t shellClientExecuteCommand(ShellClientContext *context,
                sshDeleteChannel(&context->sshChannel);
                //Update shell client state
                shellClientChangeState(context, SHELL_CLIENT_STATE_CONNECTED);
+
                //Report an error
                error = ERROR_UNEXPECTED_RESPONSE;
             }
@@ -835,12 +842,12 @@ error_t shellClientCloseStream(ShellClientContext *context)
 /**
  * @brief Retrieve exit status
  * @param[in] context Pointer to the shell client context
- * @return Exit status
+ * @return Exit status of the command
  **/
 
-uint32_t shellClientGetExitStatus(ShellClientContext *context)
+int32_t shellClientGetExitStatus(ShellClientContext *context)
 {
-   uint32_t exitStatus;
+   int32_t exitStatus;
 
    //Make sure the shell client context is valid
    if(context != NULL)
@@ -851,7 +858,7 @@ uint32_t shellClientGetExitStatus(ShellClientContext *context)
    else
    {
       //The shell client context is not valid
-      exitStatus = 0;
+      exitStatus = -1;
    }
 
    //Return exit status

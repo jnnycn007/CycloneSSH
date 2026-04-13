@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.0
+ * @version 2.6.2
  **/
 
 //Switch to the appropriate trace level
@@ -1461,18 +1461,52 @@ const char_t *sshGetSignFormatId(const SshString *publicKeyAlgo)
 bool_t sshIsGuessCorrect(SshContext *context, const SshNameList *kexAlgoList,
    const SshNameList *hostKeyAlgoList)
 {
+   uint_t i;
    bool_t correct;
-   SshString preferredKexAlgo;
-   SshString preferredHostKeyAlgo;
+   const SshHostKeyAlgo *entry;
+   const char_t *preferredKexAlgo;
+   const char_t *preferredHostKeyAlgo;
+   SshString peerPreferredKexAlgo;
+   SshString peerPreferredHostKeyAlgo;
 
    //The first key exchange algorithm of the list is the preferred algorithm
-   correct = sshGetName(kexAlgoList, 0, &preferredKexAlgo);
+   preferredKexAlgo = sshSupportedKexAlgos[0];
+
+   //Check whether SSH operates as a client or a server
+   if(context->mode == SSH_OPERATION_MODE_CLIENT)
+   {
+      //The first host key algorithm of the list is the preferred algorithm
+      preferredHostKeyAlgo = sshSupportedHostKeyAlgos[0].publicKeyAlgo;
+   }
+   else
+   {
+      //Determine the preferred host key algorithm
+      preferredHostKeyAlgo = NULL;
+
+      //Loop through the list of algorithms supported by the SSH server
+      for(i = 0; i < arraysize(sshSupportedHostKeyAlgos) &&
+         preferredHostKeyAlgo == NULL; i++)
+      {
+         //Point to the current entry
+         entry = &sshSupportedHostKeyAlgos[i];
+
+         //The server lists the algorithms for which it has host keys
+         if(sshSelectHostKey(context, entry->publicKeyAlgo) >= 0)
+         {
+            //The first host key algorithm of the list is the preferred algorithm
+            preferredHostKeyAlgo = entry->publicKeyAlgo;
+         }
+      }
+   }
+
+   //Determine the peer's preferred key exchange algorithm
+   correct = sshGetName(kexAlgoList, 0, &peerPreferredKexAlgo);
 
    //Each name-list must contain at least one algorithm name
    if(correct)
    {
-      //The first host key algorithm of the list is the preferred algorithm
-      correct = sshGetName(hostKeyAlgoList, 0, &preferredHostKeyAlgo);
+      //Determine the peer's preferred host key algorithm
+      correct = sshGetName(hostKeyAlgoList, 0, &peerPreferredHostKeyAlgo);
    }
 
    //Each name-list must contain at least one algorithm name
@@ -1481,8 +1515,8 @@ bool_t sshIsGuessCorrect(SshContext *context, const SshNameList *kexAlgoList,
       //The guess is considered wrong if the key exchange algorithm or the
       //host key algorithm is guessed wrong (server and client have different
       //preferred algorithm)
-      if(!sshCompareString(&preferredKexAlgo, sshSupportedKexAlgos[0]) ||
-         !sshCompareString(&preferredHostKeyAlgo, sshSupportedHostKeyAlgos[0].publicKeyAlgo))
+      if(!sshCompareString(&peerPreferredKexAlgo, preferredKexAlgo) ||
+         !sshCompareString(&peerPreferredHostKeyAlgo, preferredHostKeyAlgo))
       {
          correct = FALSE;
       }

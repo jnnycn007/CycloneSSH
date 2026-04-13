@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.0
+ * @version 2.6.2
  **/
 
 //Switch to the appropriate trace level
@@ -89,9 +89,9 @@ error_t shellClientChannelRequestCallback(SshChannel *channel,
    {
       SshExitStatusParams requestParams;
 
-      //An SSH_MSG_CHANNEL_REQUEST message can be sent to return the exit
-      //status when the command running at the other end terminates (refer
-      //to RFC 4254, section 6.10)
+      //When the command running at the other end terminates, a message can be
+      //sent to return the exit status of the command (refer to RFC 4254,
+      //section 6.10)
       error = sshParseExitStatusParams(data, length, &requestParams);
 
       //Check status code
@@ -101,7 +101,7 @@ error_t shellClientChannelRequestCallback(SshChannel *channel,
          if(channel == &context->sshChannel)
          {
             //Save exit status
-            context->exitStatus = requestParams.exitStatus;
+            context->exitStatus = (int32_t) requestParams.exitStatus;
          }
          else
          {

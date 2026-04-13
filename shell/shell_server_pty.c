@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.0
+ * @version 2.6.2
  **/
 
 //Switch to the appropriate trace level
@@ -306,6 +306,7 @@ error_t shellServerProcessChar(ShellServerSession *session)
             session->buffer[session->bufferLen] = '\0';
             //Add command line to history
             shellServerAddCommandLine(session, session->buffer);
+
             //Process command line
             error = shellServerProcessCommandLine(session, session->buffer);
          }

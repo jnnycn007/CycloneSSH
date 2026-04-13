@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.0
+ * @version 2.6.2
  **/
 
 //Switch to the appropriate trace level
@@ -1120,7 +1120,7 @@ error_t sshParseKexMessage(SshConnection *connection, uint8_t type,
    if(connection->wrongGuess)
    {
       //Debug message
-      TRACE_INFO("Discarding wrong guessed packet(%" PRIuSIZE " bytes)...\r\n", length);
+      TRACE_INFO("Discarding wrong guessed packet (%" PRIuSIZE " bytes)...\r\n", length);
       TRACE_VERBOSE_ARRAY("  ", message, length);
 
       //If the guess was wrong, the packet must be silently ignored and both

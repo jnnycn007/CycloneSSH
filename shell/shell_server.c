@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.0
+ * @version 2.6.2
  **/
 
 //Switch to the appropriate trace level
@@ -354,6 +354,35 @@ error_t shellServerReadStream(ShellServerSession *session, void *data,
 
 
 /**
+ * @brief Set exit status
+ * @param[in] session Handle referencing a shell session
+ * @param[in] exitStatus Exit status of the command
+ * @return Error code
+ **/
+
+error_t shellServerSetExitStatus(ShellServerSession *session,
+   int32_t exitStatus)
+{
+   error_t error;
+
+   //Valid shell session?
+   if(session != NULL)
+   {
+      //Set the exit status of the command
+      error = sshSetExitStatus(session->channel, exitStatus);
+   }
+   else
+   {
+      //Report an error
+      error = ERROR_INVALID_PARAMETER;
+   }
+
+   //Return status code
+   return error;
+}
+
+
+/**
  * @brief Save command history
  * @param[in] session Handle referencing a shell session
  * @param[out] history Output buffer where to store the command history
@@ -605,6 +634,7 @@ void shellServerTask(void *param)
       {
          //Properly terminate the command line with a NULL character
          session->buffer[session->bufferLen] = '\0';
+
          //Process command line
          error = shellServerProcessCommandLine(session, session->buffer);
       }

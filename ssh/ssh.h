@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.0
+ * @version 2.6.2
  **/
 
 #ifndef _SSH_H
@@ -74,13 +74,13 @@
 #endif
 
 //Version string
-#define CYCLONE_SSH_VERSION_STRING "2.6.0"
+#define CYCLONE_SSH_VERSION_STRING "2.6.2"
 //Major version
 #define CYCLONE_SSH_MAJOR_VERSION 2
 //Minor version
 #define CYCLONE_SSH_MINOR_VERSION 6
 //Revision number
-#define CYCLONE_SSH_REV_NUMBER 0
+#define CYCLONE_SSH_REV_NUMBER 2
 
 //SSH support
 #ifndef SSH_SUPPORT
@@ -453,7 +453,7 @@
    #error SSH_CAMELLIA_256_SUPPORT parameter is not valid
 #endif
 
-//SEED cipher support
+//SEED cipher support (weak)
 #ifndef SSH_SEED_SUPPORT
    #define SSH_SEED_SUPPORT DISABLED
 #elif (SSH_SEED_SUPPORT != ENABLED && SSH_SEED_SUPPORT != DISABLED)
@@ -1405,6 +1405,8 @@ struct _SshChannel
    bool_t closeRequest;          ///<Channel close request
    bool_t closeSent;             ///<An SSH_MSG_CHANNEL_CLOSE message has been sent
    bool_t closeReceived;         ///<An SSH_MSG_CHANNEL_CLOSE message has been received
+   int32_t exitStatus;           ///<Exit status of the command
+   bool_t exitStatusSent;        ///<An SSH_MSG_CHANNEL_REQUEST with the exit status has been sent
 };
 
 
@@ -1697,6 +1699,8 @@ error_t sshReadChannel(SshChannel *channel, void *data, size_t size,
 
 error_t sshPollChannels(SshChannelEventDesc *eventDesc, uint_t size,
    OsEvent *extEvent, systime_t timeout);
+
+error_t sshSetExitStatus(SshChannel *channel, int32_t exitStatus);
 
 error_t sshCloseChannel(SshChannel *channel);
 void sshDeleteChannel(SshChannel *channel);

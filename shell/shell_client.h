@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.0
+ * @version 2.6.2
  **/
 
 #ifndef _SHELL_CLIENT_H
@@ -109,7 +109,7 @@ struct _ShellClientContext
    char_t buffer[SHELL_CLIENT_BUFFER_SIZE];    ///<Memory buffer for input/output operations
    size_t bufferLen;                           ///<Length of the buffer, in bytes
    size_t bufferPos;                           ///<Current position in the buffer
-   uint32_t exitStatus;                        ///<Exit status
+   int32_t exitStatus;                         ///<Exit status of the command
    SshContext sshContext;                      ///<SSH context
    SshConnection sshConnection;                ///<SSH connection
    SshChannel sshChannel;                      ///<SSH channel
@@ -145,7 +145,7 @@ error_t shellClientReadStream(ShellClientContext *context, void *data,
    size_t size, size_t *received, uint_t flags);
 
 error_t shellClientCloseStream(ShellClientContext *context);
-uint32_t shellClientGetExitStatus(ShellClientContext *context);
+int32_t shellClientGetExitStatus(ShellClientContext *context);
 
 error_t shellClientDisconnect(ShellClientContext *context);
 error_t shellClientClose(ShellClientContext *context);

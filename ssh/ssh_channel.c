@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.0
+ * @version 2.6.2
  **/
 
 //Switch to the appropriate trace level
@@ -34,6 +34,7 @@
 //Dependencies
 #include "ssh/ssh.h"
 #include "ssh/ssh_connection.h"
+#include "ssh/ssh_request.h"
 #include "ssh/ssh_channel.h"
 #include "ssh/ssh_packet.h"
 #include "ssh/ssh_misc.h"
@@ -311,14 +312,38 @@ error_t sshProcessChannelEvents(SshChannel *channel)
    }
    else if(channel->closeRequest && !channel->closeSent)
    {
-      //Send an SSH_MSG_CHANNEL_CLOSE message
-      error = sshSendChannelClose(channel);
-
-      //Check status code
-      if(!error)
+      //When the command terminates, a message can be sent to return the exit
+      //status of the command (refer to RFC 4254, section 6.10)
+      if(channel->exitStatus >= 0 && !channel->exitStatusSent)
       {
-         //Update channel related events
-         sshUpdateChannelEvents(channel);
+         SshExitStatusParams requestParams;
+
+         //A zero 'exit-status' means that the command terminated successfully
+         requestParams.exitStatus = channel->exitStatus;
+
+         //Send an SSH_MSG_CHANNEL_REQUEST message
+         error = sshSendChannelRequest(channel, "exit-status", &requestParams,
+            FALSE);
+
+         //Check status code
+         if(!error)
+         {
+            //The channel needs to be closed with SSH_MSG_CHANNEL_CLOSE after
+            //this message
+            channel->exitStatusSent = TRUE;
+         }
+      }
+      else
+      {
+         //Send an SSH_MSG_CHANNEL_CLOSE message
+         error = sshSendChannelClose(channel);
+
+         //Check status code
+         if(!error)
+         {
+            //Update channel related events
+            sshUpdateChannelEvents(channel);
+         }
       }
    }
    else

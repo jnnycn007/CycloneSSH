@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.0
+ * @version 2.6.2
  **/
 
 //Switch to the appropriate trace level
@@ -2021,6 +2021,7 @@ SshChannel *sshCreateChannel(SshConnection *connection)
          channel->connection = connection;
          channel->timeout = INFINITE_DELAY;
          channel->rxWindowSize = SSH_CHANNEL_BUFFER_SIZE;
+         channel->exitStatus = -1;
 
          //When the implementation wish to open a new channel, it allocates a
          //local number for the channel (refer to RFC 4254, section 5.1)
@@ -2478,6 +2479,26 @@ error_t sshPollChannels(SshChannelEventDesc *eventDesc, uint_t size,
 
    //Return status code
    return status ? NO_ERROR : ERROR_TIMEOUT;
+}
+
+/**
+ * @brief Set exit status
+ * @param[in] channel SSH channel handle
+ * @param[in] exitStatus Exit status of the command
+ * @return Error code
+ **/
+
+error_t sshSetExitStatus(SshChannel *channel, int32_t exitStatus)
+{
+   //Make sure the SSH channel handle is valid
+   if(channel == NULL)
+      return ERROR_INVALID_PARAMETER;
+
+   //A zero 'exit-status' means that the command terminated successfully
+   channel->exitStatus = exitStatus;
+
+   //Successful processing
+   return NO_ERROR;
 }
 
 
