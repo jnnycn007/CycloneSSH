@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.2
+ * @version 2.6.4
  **/
 
 //Switch to the appropriate trace level
@@ -72,6 +72,15 @@ static const SshKeyType sshKeyTypes[] =
 #endif
 #if (SSH_ED448_SIGN_SUPPORT == ENABLED)
    {"ssh-ed448", X509_KEY_TYPE_ED448, NULL},
+#endif
+#if (SSH_MLDSA44_SIGN_SUPPORT == ENABLED)
+   {"ssh-mldsa-44", X509_KEY_TYPE_MLDSA44, NULL},
+#endif
+#if (SSH_MLDSA65_SIGN_SUPPORT == ENABLED)
+   {"ssh-mldsa-65", X509_KEY_TYPE_MLDSA65, NULL},
+#endif
+#if (SSH_MLDSA87_SIGN_SUPPORT == ENABLED)
+   {"ssh-mldsa-87", X509_KEY_TYPE_MLDSA87, NULL},
 #endif
 };
 
@@ -375,7 +384,7 @@ error_t sshImportEd25519PublicKey(EddsaPublicKey *publicKey,
          {
             //Import Ed25519 public key
             error = eddsaImportPublicKey(publicKey, ED25519_CURVE,
-               hostKey.q.value, hostKey.q.length);
+               hostKey.key.value, hostKey.key.length);
          }
 
          //Release previously allocated memory
@@ -417,8 +426,8 @@ error_t sshImportEd25519PublicKey(EddsaPublicKey *publicKey,
  * @return Error code
  **/
 
-error_t sshImportEd448PublicKey(EddsaPublicKey *publicKey,
-   const char_t *input, size_t length)
+error_t sshImportEd448PublicKey(EddsaPublicKey *publicKey, const char_t *input,
+   size_t length)
 {
 #if (SSH_ED448_SIGN_SUPPORT == ENABLED)
    error_t error;
@@ -459,7 +468,7 @@ error_t sshImportEd448PublicKey(EddsaPublicKey *publicKey,
          {
             //Import Ed448 public key
             error = eddsaImportPublicKey(publicKey, ED448_CURVE,
-               hostKey.q.value, hostKey.q.length);
+               hostKey.key.value, hostKey.key.length);
          }
 
          //Release previously allocated memory
@@ -482,6 +491,118 @@ error_t sshImportEd448PublicKey(EddsaPublicKey *publicKey,
    {
       //Clean up side effects
       eddsaFreePublicKey(publicKey);
+   }
+
+   //Return status code
+   return error;
+#else
+   //Not implemented
+   return ERROR_NOT_IMPLEMENTED;
+#endif
+}
+
+
+/**
+ * @brief Decode an SSH public key file containing an ML-DSA public key
+ * @param[out] publicKey ML-DSA public key resulting from the parsing process
+ * @param[in] input Pointer to the SSH public key file
+ * @param[in] length Length of the SSH public key file
+ * @return Error code
+ **/
+
+error_t sshImportMldsaPublicKey(MldsaPublicKey *publicKey, const char_t *input,
+   size_t length)
+{
+#if (SSH_MLDSA44_SIGN_SUPPORT == ENABLED || SSH_MLDSA65_SIGN_SUPPORT == ENABLED || \
+   SSH_MLDSA87_SIGN_SUPPORT == ENABLED)
+   error_t error;
+   size_t n;
+   uint8_t *buffer;
+   uint_t level;
+   SshMldsaHostKey hostKey;
+
+   //Check parameters
+   if(input == NULL && length != 0)
+      return ERROR_INVALID_PARAMETER;
+   if(publicKey == NULL)
+      return ERROR_INVALID_PARAMETER;
+
+   //Retrieve the length of the public key structure
+   error = sshDecodePublicKeyFile(input, length, NULL, &n);
+
+   //Check status code
+   if(!error)
+   {
+      //Allocate a memory buffer to hold the public key structure
+      buffer = sshAllocMem(n);
+
+      //Successful memory allocation?
+      if(buffer != NULL)
+      {
+         //Decode the content of the public key file (SSH2 or OpenSSH format)
+         error = sshDecodePublicKeyFile(input, length, buffer, &n);
+
+         //Check status code
+         if(!error)
+         {
+            //Parse ML-DSA host key structure
+            error = sshParseMldsaHostKey(buffer, n, &hostKey);
+         }
+
+         //Check status code
+         if(!error)
+         {
+            //Check key format identifier
+            if(sshCompareString(&hostKey.keyFormatId, "ssh-mldsa-44"))
+            {
+               //Select ML-DSA-44 parameter set
+               level = MLDSA44_SECURITY_LEVEL;
+            }
+            else if(sshCompareString(&hostKey.keyFormatId, "ssh-mldsa-65"))
+            {
+               //Select ML-DSA-65 parameter set
+               level = MLDSA65_SECURITY_LEVEL;
+            }
+            else if(sshCompareString(&hostKey.keyFormatId, "ssh-mldsa-87"))
+            {
+               //Select ML-DSA-87 parameter set
+               level = MLDSA87_SECURITY_LEVEL;
+            }
+            else
+            {
+               //Unexpected key format identifier
+               error = ERROR_WRONG_IDENTIFIER;
+            }
+         }
+
+         //Check status code
+         if(!error)
+         {
+            //Import ML-DSA public key
+            error = mldsaImportPublicKey(publicKey, level, hostKey.key.value,
+               hostKey.key.length);
+         }
+
+         //Release previously allocated memory
+         sshFreeMem(buffer);
+      }
+      else
+      {
+         //Failed to allocate memory
+         error = ERROR_OUT_OF_MEMORY;
+      }
+   }
+   else
+   {
+      //Decode the content of the public key file (PEM format)
+      error = pemImportMldsaPublicKey(publicKey, input, length);
+   }
+
+   //Any error to report?
+   if(error)
+   {
+      //Clean up side effects
+      mldsaFreePublicKey(publicKey);
    }
 
    //Return status code

@@ -1,6 +1,6 @@
 /**
- * @file sftp_client_misc.h
- * @brief Helper functions for SFTP client
+ * @file ssh_kex_kem.h
+ * @brief Pure post-quantum key exchange
  *
  * @section License
  *
@@ -28,41 +28,37 @@
  * @version 2.6.4
  **/
 
-#ifndef _SFTP_CLIENT_MISC_H
-#define _SFTP_CLIENT_MISC_H
+#ifndef _SSH_KEX_KEM_H
+#define _SSH_KEX_KEM_H
 
 //Dependencies
-#include "sftp/sftp_client.h"
+#include "ssh/ssh.h"
 
 //C++ guard
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-//SFTP client related functions
-void sftpClientChangeState(SftpClientContext *context,
-   SftpClientState newState);
+//SSH related functions
+error_t sshSendKexKemInit(SshConnection *connection);
+error_t sshSendKexKemReply(SshConnection *connection);
 
-error_t sftpClientOpenConnection(SftpClientContext *context);
-error_t sftpClientEstablishConnection(SftpClientContext *context);
-void sftpClientCloseConnection(SftpClientContext *context);
+error_t sshFormatKexKemReply(SshConnection *connection, uint8_t *p,
+   size_t *length);
 
-error_t sftpClientSendCommand(SftpClientContext *context);
-error_t sftpClientProcessEvents(SftpClientContext *context);
+error_t sshFormatKexKemInit(SshConnection *connection, uint8_t *p,
+   size_t *length);
 
-error_t sftpClientParsePacketLength(SftpClientContext *context,
-   const uint8_t *packet);
+error_t sshParseKexKemInit(SshConnection *connection,
+   const uint8_t *message, size_t length);
 
-error_t sftpClientParsePacket(SftpClientContext *context, const uint8_t *packet,
-   size_t fragLen, size_t totalLen);
+error_t sshParseKexKemReply(SshConnection *connection,
+   const uint8_t *message, size_t length);
 
-error_t sftpClientCheckTimeout(SftpClientContext *context);
+error_t sshParseKexKemMessage(SshConnection *connection, uint8_t type,
+   const uint8_t *message, size_t length);
 
-error_t sftpFormatPath(SftpClientContext *context, const char_t *path,
-   uint8_t *p, size_t *written);
-
-void sftpGetAbsolutePath(SftpClientContext *context, const char_t *path,
-   char_t *fullPath);
+error_t sshSelectKemAlgo(SshConnection *connection);
 
 //C++ guard
 #ifdef __cplusplus

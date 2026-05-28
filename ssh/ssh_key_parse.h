@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.2
+ * @version 2.6.4
  **/
 
 #ifndef _SSH_KEY_PARSE_H
@@ -89,8 +89,19 @@ typedef struct
 typedef struct
 {
    SshString keyFormatId;
-   SshBinaryString q;
+   SshBinaryString key;
 } SshEddsaHostKey;
+
+
+/**
+ * @brief ML-DSA host key
+ **/
+
+typedef struct
+{
+   SshString keyFormatId;
+   SshBinaryString key;
+} SshMldsaHostKey;
 
 
 /**
@@ -194,6 +205,9 @@ error_t sshParseEd25519HostKey(const uint8_t *data, size_t length,
 
 error_t sshParseEd448HostKey(const uint8_t *data, size_t length,
    SshEddsaHostKey *hostKey);
+
+error_t sshParseMldsaHostKey(const uint8_t *data, size_t length,
+   SshMldsaHostKey *hostKey);
 
 error_t sshParseOpenSshPrivateKeyHeader(const uint8_t *data, size_t length,
    SshPrivateKeyHeader *privateKeyHeader);

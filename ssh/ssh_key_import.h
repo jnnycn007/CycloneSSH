@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.2
+ * @version 2.6.4
  **/
 
 #ifndef _SSH_KEY_IMPORT_H
@@ -39,6 +39,7 @@
 #include "pkc/dsa.h"
 #include "ecc/ec.h"
 #include "ecc/eddsa.h"
+#include "pqc/mldsa.h"
 
 //C++ guard
 #ifdef __cplusplus
@@ -71,8 +72,11 @@ error_t sshImportEcdsaPublicKey(EcPublicKey *publicKey, const char_t *input,
 error_t sshImportEd25519PublicKey(EddsaPublicKey *publicKey,
    const char_t *input, size_t length);
 
-error_t sshImportEd448PublicKey(EddsaPublicKey *publicKey,
-   const char_t *input, size_t length);
+error_t sshImportEd448PublicKey(EddsaPublicKey *publicKey, const char_t *input,
+   size_t length);
+
+error_t sshImportMldsaPublicKey(MldsaPublicKey *publicKey, const char_t *input,
+   size_t length);
 
 error_t sshImportRsaPrivateKey(RsaPrivateKey *privateKey, const char_t *input,
    size_t length, const char_t *password);

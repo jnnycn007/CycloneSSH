@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.2
+ * @version 2.6.4
  **/
 
 //Switch to the appropriate trace level
@@ -36,10 +36,6 @@
 #include "ssh/ssh_cert_import.h"
 #include "ssh/ssh_misc.h"
 #include "encoding/base64.h"
-#include "pkc/rsa.h"
-#include "pkc/dsa.h"
-#include "ecc/ec.h"
-#include "ecc/eddsa.h"
 #include "debug.h"
 
 //Check SSH stack configuration

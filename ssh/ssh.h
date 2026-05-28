@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.2
+ * @version 2.6.4
  **/
 
 #ifndef _SSH_H
@@ -74,13 +74,13 @@
 #endif
 
 //Version string
-#define CYCLONE_SSH_VERSION_STRING "2.6.2"
+#define CYCLONE_SSH_VERSION_STRING "2.6.4"
 //Major version
 #define CYCLONE_SSH_MAJOR_VERSION 2
 //Minor version
 #define CYCLONE_SSH_MINOR_VERSION 6
 //Revision number
-#define CYCLONE_SSH_REV_NUMBER 2
+#define CYCLONE_SSH_REV_NUMBER 4
 
 //SSH support
 #ifndef SSH_SUPPORT
@@ -598,6 +598,27 @@
    #define SSH_ED448_SIGN_SUPPORT DISABLED
 #elif (SSH_ED448_SIGN_SUPPORT != ENABLED && SSH_ED448_SIGN_SUPPORT != DISABLED)
    #error SSH_ED448_SIGN_SUPPORT parameter is not valid
+#endif
+
+//ML-DSA-44 signature support
+#ifndef SSH_MLDSA44_SIGN_SUPPORT
+   #define SSH_MLDSA44_SIGN_SUPPORT DISABLED
+#elif (SSH_MLDSA44_SIGN_SUPPORT != ENABLED && SSH_MLDSA44_SIGN_SUPPORT != DISABLED)
+   #error SSH_MLDSA44_SIGN_SUPPORT parameter is not valid
+#endif
+
+//ML-DSA-65 signature support
+#ifndef SSH_MLDSA65_SIGN_SUPPORT
+   #define SSH_MLDSA65_SIGN_SUPPORT DISABLED
+#elif (SSH_MLDSA65_SIGN_SUPPORT != ENABLED && SSH_MLDSA65_SIGN_SUPPORT != DISABLED)
+   #error SSH_MLDSA65_SIGN_SUPPORT parameter is not valid
+#endif
+
+//ML-DSA-87 signature support
+#ifndef SSH_MLDSA87_SIGN_SUPPORT
+   #define SSH_MLDSA87_SIGN_SUPPORT DISABLED
+#elif (SSH_MLDSA87_SIGN_SUPPORT != ENABLED && SSH_MLDSA87_SIGN_SUPPORT != DISABLED)
+   #error SSH_MLDSA87_SIGN_SUPPORT parameter is not valid
 #endif
 
 //NIST P-256 elliptic curve support

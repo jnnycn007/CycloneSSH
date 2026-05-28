@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.2
+ * @version 2.6.4
  **/
 
 //Switch to the appropriate trace level
@@ -36,6 +36,7 @@
 #include "ssh/ssh_key_parse.h"
 #include "ssh/ssh_misc.h"
 #include "ecc/eddsa.h"
+#include "pqc/mldsa.h"
 #include "debug.h"
 
 //Check SSH stack configuration
@@ -366,18 +367,18 @@ error_t sshParseEd25519HostKey(const uint8_t *data, size_t length,
    length -= sizeof(uint32_t) + hostKey->keyFormatId.length;
 
    //Parse Ed25519 public key
-   error = sshParseBinaryString(data, length, &hostKey->q);
+   error = sshParseBinaryString(data, length, &hostKey->key);
    //Any error to report?
    if(error)
       return error;
 
    //The public key shall consist of 32 octets
-   if(hostKey->q.length != ED25519_PUBLIC_KEY_LEN)
+   if(hostKey->key.length != ED25519_PUBLIC_KEY_LEN)
       return ERROR_INVALID_SYNTAX;
 
    //Point to the next field
-   data += sizeof(uint32_t) + hostKey->q.length;
-   length -= sizeof(uint32_t) + hostKey->q.length;
+   data += sizeof(uint32_t) + hostKey->key.length;
+   length -= sizeof(uint32_t) + hostKey->key.length;
 
    //Malformed host key?
    if(length != 0)
@@ -421,18 +422,93 @@ error_t sshParseEd448HostKey(const uint8_t *data, size_t length,
    length -= sizeof(uint32_t) + hostKey->keyFormatId.length;
 
    //Parse Ed448 public key
-   error = sshParseBinaryString(data, length, &hostKey->q);
+   error = sshParseBinaryString(data, length, &hostKey->key);
    //Any error to report?
    if(error)
       return error;
 
    //The public key shall consist of 57 octets
-   if(hostKey->q.length != ED448_PUBLIC_KEY_LEN)
+   if(hostKey->key.length != ED448_PUBLIC_KEY_LEN)
       return ERROR_INVALID_SYNTAX;
 
    //Point to the next field
-   data += sizeof(uint32_t) + hostKey->q.length;
-   length -= sizeof(uint32_t) + hostKey->q.length;
+   data += sizeof(uint32_t) + hostKey->key.length;
+   length -= sizeof(uint32_t) + hostKey->key.length;
+
+   //Malformed host key?
+   if(length != 0)
+      return ERROR_INVALID_SYNTAX;
+
+   //Successful processing
+   return NO_ERROR;
+#else
+   //Not implemented
+   return ERROR_NOT_IMPLEMENTED;
+#endif
+}
+
+
+/**
+ * @brief Parse an ML-DSA host key structure
+ * @param[in] data Pointer to the host key structure
+ * @param[in] length Length of the host key structure, in bytes
+ * @param[out] hostKey Information resulting from the parsing process
+ * @return Error code
+ **/
+
+error_t sshParseMldsaHostKey(const uint8_t *data, size_t length,
+   SshMldsaHostKey *hostKey)
+{
+#if (SSH_MLDSA44_SIGN_SUPPORT == ENABLED || SSH_MLDSA65_SIGN_SUPPORT == ENABLED || \
+   SSH_MLDSA87_SIGN_SUPPORT == ENABLED)
+   error_t error;
+   size_t n;
+
+   //Decode key format identifier
+   error = sshParseString(data, length, &hostKey->keyFormatId);
+   //Any error to report?
+   if(error)
+      return error;
+
+   //Check key format identifier
+   if(sshCompareString(&hostKey->keyFormatId, "ssh-mldsa-44"))
+   {
+      //The public key is a 1312-byte octet string
+      n = MLDSA44_PUBLIC_KEY_LEN;
+   }
+   else if(sshCompareString(&hostKey->keyFormatId, "ssh-mldsa-65"))
+   {
+      //The public key is a 1952-byte octet string
+      n = MLDSA65_PUBLIC_KEY_LEN;
+   }
+   else if(sshCompareString(&hostKey->keyFormatId, "ssh-mldsa-87"))
+   {
+      //The public key is a 2592-byte octet string
+      n = MLDSA87_PUBLIC_KEY_LEN;
+   }
+   else
+   {
+      //Unexpected key format identifier
+      return ERROR_WRONG_IDENTIFIER;
+   }
+
+   //Point to the next field
+   data += sizeof(uint32_t) + hostKey->keyFormatId.length;
+   length -= sizeof(uint32_t) + hostKey->keyFormatId.length;
+
+   //Parse ML-DSA public key
+   error = sshParseBinaryString(data, length, &hostKey->key);
+   //Any error to report?
+   if(error)
+      return error;
+
+   //Check the length of the public key
+   if(hostKey->key.length != n)
+      return ERROR_INVALID_SYNTAX;
+
+   //Point to the next field
+   data += sizeof(uint32_t) + hostKey->key.length;
+   length -= sizeof(uint32_t) + hostKey->key.length;
 
    //Malformed host key?
    if(length != 0)

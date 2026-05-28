@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.2
+ * @version 2.6.4
  **/
 
 //Switch to the appropriate trace level
@@ -351,6 +351,83 @@ error_t sshFormatEd448PublicKey(const EddsaPublicKey *publicKey,
 
    //Format Ed448 public key
    error = eddsaExportPublicKey(publicKey,
+      SSH_INC_POINTER(p, sizeof(uint32_t)), &n);
+   //Any error to report?
+   if(error)
+      return error;
+
+   //The octet string value is preceded by a uint32 containing its length
+   if(p != NULL)
+   {
+      STORE32BE(n, p);
+   }
+
+   //Total number of bytes that have been written
+   *written += sizeof(uint32_t) + n;
+
+   //Successful processing
+   return NO_ERROR;
+#else
+   //Not implemented
+   return ERROR_NOT_IMPLEMENTED;
+#endif
+}
+
+
+/**
+ * @brief Format an ML-DSA public host key
+ * @param[in] publicKey Pointer to the ML-DSA public key
+ * @param[out] p Buffer where to store the host key structure
+ * @param[out] written Length of the resulting host key structure
+ * @return Error code
+ **/
+
+error_t sshFormatMldsaPublicKey(const MldsaPublicKey *publicKey,
+   uint8_t *p, size_t *written)
+{
+#if (SSH_MLDSA44_SIGN_SUPPORT == ENABLED || SSH_MLDSA65_SIGN_SUPPORT == ENABLED || \
+   SSH_MLDSA87_SIGN_SUPPORT == ENABLED)
+   error_t error;
+   size_t n;
+   const char_t *keyFormatId;
+
+   //Total length of the public host key structure
+   *written = 0;
+
+   //Check security level
+   if(publicKey->level == MLDSA44_SECURITY_LEVEL)
+   {
+      //Select ML-DSA-44 parameter set
+      keyFormatId = "ssh-mldsa-44";
+   }
+   else if(publicKey->level == MLDSA65_SECURITY_LEVEL)
+   {
+      //Select ML-DSA-65 parameter set
+      keyFormatId = "ssh-mldsa-65";
+   }
+   else if(publicKey->level == MLDSA87_SECURITY_LEVEL)
+   {
+      //Select ML-DSA-87 parameter set
+      keyFormatId = "ssh-mldsa-87";
+   }
+   else
+   {
+      //Invalid security level
+      return ERROR_INVALID_KEY;
+   }
+
+   //Format public key format identifier
+   error = sshFormatString(keyFormatId, p, &n);
+   //Any error to report?
+   if(error)
+      return error;
+
+   //Point to the next field
+   p = SSH_INC_POINTER(p, n);
+   *written += n;
+
+   //Format ML-DSA public key
+   error = mldsaExportPublicKey(publicKey,
       SSH_INC_POINTER(p, sizeof(uint32_t)), &n);
    //Any error to report?
    if(error)

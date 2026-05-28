@@ -1,6 +1,6 @@
 /**
- * @file ssh_kex_ecdh.c
- * @brief ECDH key exchange
+ * @file ssh_kex_kem.c
+ * @brief Pure post-quantum key exchange
  *
  * @section License
  *
@@ -36,7 +36,7 @@
 #include "ssh/ssh_algorithms.h"
 #include "ssh/ssh_transport.h"
 #include "ssh/ssh_kex.h"
-#include "ssh/ssh_kex_ecdh.h"
+#include "ssh/ssh_kex_kem.h"
 #include "ssh/ssh_packet.h"
 #include "ssh/ssh_key_material.h"
 #include "ssh/ssh_exchange_hash.h"
@@ -46,47 +46,52 @@
 #include "debug.h"
 
 //Check SSH stack configuration
-#if (SSH_SUPPORT == ENABLED && SSH_ECDH_KEX_SUPPORT == ENABLED)
+#if (SSH_SUPPORT == ENABLED && SSH_KEM_KEX_SUPPORT == ENABLED)
 
 
 /**
- * @brief Send SSH_MSG_KEX_ECDH_INIT message
+ * @brief Send SSH_MSG_KEX_KEM_INIT message
  * @param[in] connection Pointer to the SSH connection
  * @return Error code
  **/
 
-error_t sshSendKexEcdhInit(SshConnection *connection)
+error_t sshSendKexKemInit(SshConnection *connection)
 {
 #if (SSH_CLIENT_SUPPORT == ENABLED)
    error_t error;
    size_t length;
    uint8_t *message;
+   SshContext *context;
+
+   //Point to the SSH context
+   context = connection->context;
 
    //Point to the buffer where to format the message
    message = connection->buffer + SSH_PACKET_HEADER_SIZE;
 
-   //Select ECDH domain parameters
-   error = sshSelectEcdhCurve(connection);
+   //Key exchange algorithms are formulated as key encapsulation mechanisms
+   error = sshSelectKemAlgo(connection);
 
    //Check status code
    if(!error)
    {
-      //Generate an ephemeral key pair
-      error = sshGenerateEcdhKeyPair(connection);
+      //Generate a post-quantum KEM key pair
+      error = kemGenerateKeyPair(&connection->kemContext, context->prngAlgo,
+         context->prngContext);
    }
 
    //Check status code
    if(!error)
    {
-      //Format SSH_MSG_KEX_ECDH_INIT message
-      error = sshFormatKexEcdhInit(connection, message, &length);
+      //Format SSH_MSG_KEX_KEM_INIT message
+      error = sshFormatKexKemInit(connection, message, &length);
    }
 
    //Check status code
    if(!error)
    {
       //Debug message
-      TRACE_INFO("Sending SSH_MSG_KEX_ECDH_INIT message (%" PRIuSIZE " bytes)...\r\n", length);
+      TRACE_INFO("Sending SSH_MSG_KEX_KEM_INIT message (%" PRIuSIZE " bytes)...\r\n", length);
       TRACE_VERBOSE_ARRAY("  ", message, length);
 
       //Send message
@@ -96,8 +101,8 @@ error_t sshSendKexEcdhInit(SshConnection *connection)
    //Check status code
    if(!error)
    {
-      //The server responds with an SSH_MSG_KEX_ECDH_REPLY message
-      connection->state = SSH_CONN_STATE_KEX_ECDH_REPLY;
+      //The server responds with an SSH_MSG_KEX_KEM_REPLY message
+      connection->state = SSH_CONN_STATE_KEX_KEM_REPLY;
    }
 
    //Return status code
@@ -110,12 +115,12 @@ error_t sshSendKexEcdhInit(SshConnection *connection)
 
 
 /**
- * @brief Send SSH_MSG_KEX_ECDH_REPLY message
+ * @brief Send SSH_MSG_KEX_KEM_REPLY message
  * @param[in] connection Pointer to the SSH connection
  * @return Error code
  **/
 
-error_t sshSendKexEcdhReply(SshConnection *connection)
+error_t sshSendKexKemReply(SshConnection *connection)
 {
 #if (SSH_SERVER_SUPPORT == ENABLED)
    error_t error;
@@ -125,21 +130,14 @@ error_t sshSendKexEcdhReply(SshConnection *connection)
    //Point to the buffer where to format the message
    message = connection->buffer + SSH_PACKET_HEADER_SIZE;
 
-   //Generate an ephemeral key pair
-   error = sshGenerateEcdhKeyPair(connection);
-
-   //Check status code
-   if(!error)
-   {
-      //Format SSH_MSG_KEX_ECDH_REPLY message
-      error = sshFormatKexEcdhReply(connection, message, &length);
-   }
+   //Format SSH_MSG_KEX_KEM_REPLY message
+   error = sshFormatKexKemReply(connection, message, &length);
 
    //Check status code
    if(!error)
    {
       //Debug message
-      TRACE_INFO("Sending SSH_MSG_KEX_ECDH_REPLY message (%" PRIuSIZE " bytes)...\r\n", length);
+      TRACE_INFO("Sending SSH_MSG_KEX_KEM_REPLY message (%" PRIuSIZE " bytes)...\r\n", length);
       TRACE_VERBOSE_ARRAY("  ", message, length);
 
       //Send message
@@ -163,37 +161,34 @@ error_t sshSendKexEcdhReply(SshConnection *connection)
 
 
 /**
- * @brief Format SSH_MSG_KEX_ECDH_INIT message
+ * @brief Format SSH_MSG_KEX_KEM_INIT message
  * @param[in] connection Pointer to the SSH connection
  * @param[out] p Buffer where to format the message
  * @param[out] length Length of the resulting message, in bytes
  * @return Error code
  **/
 
-error_t sshFormatKexEcdhInit(SshConnection *connection, uint8_t *p,
+error_t sshFormatKexKemInit(SshConnection *connection, uint8_t *p,
    size_t *length)
 {
 #if (SSH_CLIENT_SUPPORT == ENABLED)
-   error_t error;
    size_t n;
 
    //Total length of the message
    *length = 0;
 
    //Set message type
-   p[0] = SSH_MSG_KEX_ECDH_INIT;
+   p[0] = SSH_MSG_KEX_KEM_INIT;
 
    //Point to the first field of the message
    p += sizeof(uint8_t);
    *length += sizeof(uint8_t);
 
-   //Format client's ephemeral public key (Q_C)
-   error = ecdhExportPublicKey(&connection->ecdhContext, p + sizeof(uint32_t),
-      &n, EC_PUBLIC_KEY_FORMAT_X963);
-   //Any error to report?
-   if(error)
-      return error;
+   //Get the length of the public key
+   n = connection->kemContext.kemAlgo->publicKeySize;
 
+   //C_INIT is the ephemeral client ML-KEM public key (C_PK)
+   osMemcpy(p + sizeof(uint32_t), connection->kemContext.pk, n);
    //The octet string value is preceded by a uint32 containing its length
    STORE32BE(n, p);
 
@@ -210,25 +205,29 @@ error_t sshFormatKexEcdhInit(SshConnection *connection, uint8_t *p,
 
 
 /**
- * @brief Format SSH_MSG_KEX_ECDH_REPLY message
+ * @brief Format SSH_MSG_KEX_KEM_REPLY message
  * @param[in] connection Pointer to the SSH connection
  * @param[out] p Buffer where to format the message
  * @param[out] length Length of the resulting message, in bytes
  * @return Error code
  **/
 
-error_t sshFormatKexEcdhReply(SshConnection *connection, uint8_t *p,
+error_t sshFormatKexKemReply(SshConnection *connection, uint8_t *p,
    size_t *length)
 {
 #if (SSH_SERVER_SUPPORT == ENABLED)
    error_t error;
    size_t n;
+   SshContext *context;
+
+   //Point to the SSH context
+   context = connection->context;
 
    //Total length of the message
    *length = 0;
 
    //Set message type
-   p[0] = SSH_MSG_KEX_ECDH_REPLY;
+   p[0] = SSH_MSG_KEX_KEM_REPLY;
 
    //Point to the first field of the message
    p += sizeof(uint8_t);
@@ -247,14 +246,18 @@ error_t sshFormatKexEcdhReply(SshConnection *connection, uint8_t *p,
    p += sizeof(uint32_t) + n;
    *length += sizeof(uint32_t) + n;
 
-   //Format server's ephemeral public key (Q_S)
-   error = ecdhExportPublicKey(&connection->ecdhContext, p + sizeof(uint32_t),
-      &n, EC_PUBLIC_KEY_FORMAT_X963);
+   //Perform KEM encapsulation
+   error = kemEncapsulate(&connection->kemContext, context->prngAlgo,
+      context->prngContext, p + sizeof(uint32_t), connection->k +
+      sizeof(uint32_t));
    //Any error to report?
    if(error)
       return error;
 
-   //Update exchange hash H with Q_S (server's ephemeral public key octet string)
+   //Get the length of the KEM ciphertext
+   n = connection->kemContext.kemAlgo->ciphertextSize;
+
+   //Update exchange hash H with S_REPLY
    error = sshUpdateExchangeHash(connection, p + sizeof(uint32_t), n);
    //Any error to report?
    if(error)
@@ -267,13 +270,17 @@ error_t sshFormatKexEcdhReply(SshConnection *connection, uint8_t *p,
    p += sizeof(uint32_t) + n;
    *length += sizeof(uint32_t) + n;
 
-   //Compute the shared secret K
-   error = sshComputeEcdhSharedSecret(connection);
-   //Any error to report?
-   if(error)
-      return error;
+   //Get the length of the KEM shared secret
+   n = connection->kemContext.kemAlgo->sharedSecretSize;
 
-   //Update exchange hash H with K (shared secret)
+   //Log shared secret (for debugging purpose only)
+   sshDumpKey(connection, "SHARED_SECRET", connection->k + sizeof(uint32_t), n);
+
+   //Convert K_PQ to string representation
+   STORE32BE(n, connection->k);
+   connection->kLen = sizeof(uint32_t) + n;
+
+   //Update exchange hash H with K_PQ (shared secret)
    error = sshUpdateExchangeHashRaw(connection, connection->k,
       connection->kLen);
    //Any error to report?
@@ -293,10 +300,9 @@ error_t sshFormatKexEcdhReply(SshConnection *connection, uint8_t *p,
    //Total length of the message
    *length += sizeof(uint32_t) + n;
 
-   //The ephemeral private key shall be destroyed as soon as possible (refer
-   //to RFC 9212, section 6)
-   ecdhFree(&connection->ecdhContext);
-   ecdhInit(&connection->ecdhContext);
+   //Destroy post-quantum private key
+   kemFree(&connection->kemContext);
+   kemInit(&connection->kemContext, NULL);
 
    //Successful processing
    return NO_ERROR;
@@ -308,23 +314,23 @@ error_t sshFormatKexEcdhReply(SshConnection *connection, uint8_t *p,
 
 
 /**
- * @brief Parse SSH_MSG_KEX_ECDH_INIT message
+ * @brief Parse SSH_MSG_KEX_KEM_INIT message
  * @param[in] connection Pointer to the SSH connection
  * @param[in] message Pointer to message
  * @param[in] length Length of the message, in bytes
  * @return Error code
  **/
 
-error_t sshParseKexEcdhInit(SshConnection *connection, const uint8_t *message,
-   size_t length)
+error_t sshParseKexKemInit(SshConnection *connection,
+   const uint8_t *message, size_t length)
 {
 #if (SSH_SERVER_SUPPORT == ENABLED)
    error_t error;
    const uint8_t *p;
-   SshBinaryString publicKey;
+   SshBinaryString clientInit;
 
    //Debug message
-   TRACE_INFO("SSH_MSG_KEX_ECDH_INIT message received (%" PRIuSIZE " bytes)...\r\n", length);
+   TRACE_INFO("SSH_MSG_KEX_KEM_INIT message received (%" PRIuSIZE " bytes)...\r\n", length);
    TRACE_VERBOSE_ARRAY("  ", message, length);
 
    //Check operation mode
@@ -332,7 +338,7 @@ error_t sshParseKexEcdhInit(SshConnection *connection, const uint8_t *message,
       return ERROR_UNEXPECTED_MESSAGE;
 
    //Check connection state
-   if(connection->state != SSH_CONN_STATE_KEX_ECDH_INIT)
+   if(connection->state != SSH_CONN_STATE_KEX_KEM_INIT)
       return ERROR_UNEXPECTED_MESSAGE;
 
    //Sanity check
@@ -344,41 +350,49 @@ error_t sshParseKexEcdhInit(SshConnection *connection, const uint8_t *message,
    //Remaining bytes to process
    length -= sizeof(uint8_t);
 
-   //Decode client's ephemeral public key (Q_C)
-   error = sshParseBinaryString(p, length, &publicKey);
+   //C_INIT is the ephemeral client ML-KEM public key (C_PK)
+   error = sshParseBinaryString(p, length, &clientInit);
    //Any error to report?
    if(error)
       return error;
 
    //Point to the next field
-   p += sizeof(uint32_t) + publicKey.length;
-   length -= sizeof(uint32_t) + publicKey.length;
+   p += sizeof(uint32_t) + clientInit.length;
+   length -= sizeof(uint32_t) + clientInit.length;
 
    //Malformed message?
    if(length != 0)
       return ERROR_INVALID_MESSAGE;
 
-   //Update exchange hash H with Q_C (client's ephemeral public key octet string)
-   error = sshUpdateExchangeHash(connection, publicKey.value, publicKey.length);
+   //Update exchange hash H with C_INIT
+   error = sshUpdateExchangeHash(connection, clientInit.value,
+      clientInit.length);
    //Any error to report?
    if(error)
       return error;
 
-   //Select ECDH domain parameters
-   error = sshSelectEcdhCurve(connection);
+   //Key exchange algorithms are formulated as key encapsulation mechanisms
+   error = sshSelectKemAlgo(connection);
    //Any error to report?
    if(error)
       return error;
 
-   //Load client's ephemeral public key
-   error = ecdhImportPeerPublicKey(&connection->ecdhContext, publicKey.value,
-      publicKey.length, EC_PUBLIC_KEY_FORMAT_X963);
+   //Check the length of the C_INIT field
+   if(clientInit.length != connection->kemContext.kemAlgo->publicKeySize)
+   {
+      //Abort using a disconnect message (SSH_MSG_DISCONNECT) with a
+      //SSH_DISCONNECT_KEY_EXCHANGE_FAILED as the reason
+      return ERROR_KEY_EXCH_FAILED;
+   }
+
+   //Load ephemeral client ML-KEM public key (C_PK)
+   error = kemLoadPublicKey(&connection->kemContext, clientInit.value);
    //Any error to report?
    if(error)
       return error;
 
-   //The server responds with an SSH_MSG_KEX_ECDH_REPLY message
-   return sshSendKexEcdhReply(connection);
+   //The server responds with an SSH_MSG_KEX_KEM_REPLY message
+   return sshSendKexKemReply(connection);
 #else
    //Server operation mode is not implemented
    return ERROR_UNEXPECTED_MESSAGE;
@@ -387,22 +401,23 @@ error_t sshParseKexEcdhInit(SshConnection *connection, const uint8_t *message,
 
 
 /**
- * @brief Parse SSH_MSG_KEX_ECDH_REPLY message
+ * @brief Parse SSH_MSG_KEX_KEM_REPLY message
  * @param[in] connection Pointer to the SSH connection
  * @param[in] message Pointer to message
  * @param[in] length Length of the message, in bytes
  * @return Error code
  **/
 
-error_t sshParseKexEcdhReply(SshConnection *connection, const uint8_t *message,
-   size_t length)
+error_t sshParseKexKemReply(SshConnection *connection,
+   const uint8_t *message, size_t length)
 {
 #if (SSH_CLIENT_SUPPORT == ENABLED)
    error_t error;
+   size_t n;
    const uint8_t *p;
    SshString hostKeyAlgo;
    SshBinaryString hostKey;
-   SshBinaryString publicKey;
+   SshBinaryString serverReply;
    SshBinaryString signature;
    SshContext *context;
 
@@ -410,7 +425,7 @@ error_t sshParseKexEcdhReply(SshConnection *connection, const uint8_t *message,
    context = connection->context;
 
    //Debug message
-   TRACE_INFO("SSH_MSG_KEX_ECDH_REPLY message received (%" PRIuSIZE " bytes)...\r\n", length);
+   TRACE_INFO("SSH_MSG_KEX_KEM_REPLY message received (%" PRIuSIZE " bytes)...\r\n", length);
    TRACE_VERBOSE_ARRAY("  ", message, length);
 
    //Check operation mode
@@ -418,7 +433,7 @@ error_t sshParseKexEcdhReply(SshConnection *connection, const uint8_t *message,
       return ERROR_UNEXPECTED_MESSAGE;
 
    //Check connection state
-   if(connection->state != SSH_CONN_STATE_KEX_ECDH_REPLY)
+   if(connection->state != SSH_CONN_STATE_KEX_KEM_REPLY)
       return ERROR_UNEXPECTED_MESSAGE;
 
    //Sanity check
@@ -440,15 +455,15 @@ error_t sshParseKexEcdhReply(SshConnection *connection, const uint8_t *message,
    p += sizeof(uint32_t) + hostKey.length;
    length -= sizeof(uint32_t) + hostKey.length;
 
-   //Decode server's ephemeral public key (Q_S)
-   error = sshParseBinaryString(p, length, &publicKey);
+   //Decode S_REPLY
+   error = sshParseBinaryString(p, length, &serverReply);
    //Any error to report?
    if(error)
       return error;
 
    //Point to the next field
-   p += sizeof(uint32_t) + publicKey.length;
-   length -= sizeof(uint32_t) + publicKey.length;
+   p += sizeof(uint32_t) + serverReply.length;
+   length -= sizeof(uint32_t) + serverReply.length;
 
    //Decode the signature field
    error = sshParseBinaryString(p, length, &signature);
@@ -493,35 +508,48 @@ error_t sshParseKexEcdhReply(SshConnection *connection, const uint8_t *message,
    if(error)
       return error;
 
-   //Update exchange hash H with Q_C (client's ephemeral public key octet
-   //string)
-   error = sshDigestClientEcdhPublicKey(connection);
+   //Update exchange hash H with C_INIT
+   error = sshUpdateExchangeHash(connection, connection->kemContext.pk,
+      connection->kemContext.kemAlgo->publicKeySize);
    //Any error to report?
    if(error)
       return error;
 
-   //Update exchange hash H with Q_S (server's ephemeral public key octet
-   //string)
-   error = sshUpdateExchangeHash(connection, publicKey.value,
-      publicKey.length);
+   //Update exchange hash H with S_REPLY
+   error = sshUpdateExchangeHash(connection, serverReply.value,
+      serverReply.length);
    //Any error to report?
    if(error)
       return error;
 
-   //Load server's ephemeral public key
-   error = ecdhImportPeerPublicKey(&connection->ecdhContext, publicKey.value,
-      publicKey.length, EC_PUBLIC_KEY_FORMAT_X963);
+   //Before decapsulating, the client must check if the ciphertext S_CT length
+   //matches the selected ML-KEM variant
+   if(serverReply.length != connection->kemContext.kemAlgo->ciphertextSize)
+   {
+      //The client must abort using a disconnect message (SSH_MSG_DISCONNECT)
+      //with a SSH_DISCONNECT_KEY_EXCHANGE_FAILED as the reason if the S_CT
+      //length does not match the ML-KEM variant
+      return ERROR_KEY_EXCH_FAILED;
+   }
+
+   //K_PQ is the post-quantum shared secret decapsulated from S_CT
+   error = kemDecapsulate(&connection->kemContext, serverReply.value,
+      connection->k + sizeof(uint32_t));
    //Any error to report?
    if(error)
       return error;
 
-   //Compute the shared secret K
-   error = sshComputeEcdhSharedSecret(connection);
-   //Any error to report?
-   if(error)
-      return error;
+   //Get the length of the KEM shared secret
+   n = connection->kemContext.kemAlgo->sharedSecretSize;
 
-   //Update exchange hash H with K (shared secret)
+   //Log shared secret (for debugging purpose only)
+   sshDumpKey(connection, "SHARED_SECRET", connection->k + sizeof(uint32_t), n);
+
+   //Convert K_PQ to string representation
+   STORE32BE(n, connection->k);
+   connection->kLen = sizeof(uint32_t) + n;
+
+   //Update exchange hash H with K_PQ (shared secret)
    error = sshUpdateExchangeHashRaw(connection, connection->k,
       connection->kLen);
    //Any error to report?
@@ -534,10 +562,9 @@ error_t sshParseKexEcdhReply(SshConnection *connection, const uint8_t *message,
    if(error)
       return error;
 
-   //The ephemeral private key shall be destroyed as soon as possible (refer
-   //to RFC 9212, section 6)
-   ecdhFree(&connection->ecdhContext);
-   ecdhInit(&connection->ecdhContext);
+   //Destroy post-quantum private key
+   kemFree(&connection->kemContext);
+   kemInit(&connection->kemContext, NULL);
 
    //Key exchange ends by each side sending an SSH_MSG_NEWKEYS message
    return sshSendNewKeys(connection);
@@ -549,7 +576,7 @@ error_t sshParseKexEcdhReply(SshConnection *connection, const uint8_t *message,
 
 
 /**
- * @brief Parse ECDH specific messages
+ * @brief Parse ML-KEM specific messages
  * @param[in] connection Pointer to the SSH connection
  * @param[in] type SSH message type
  * @param[in] message Pointer to message
@@ -557,7 +584,7 @@ error_t sshParseKexEcdhReply(SshConnection *connection, const uint8_t *message,
  * @return Error code
  **/
 
-error_t sshParseKexEcdhMessage(SshConnection *connection, uint8_t type,
+error_t sshParseKexKemMessage(SshConnection *connection, uint8_t type,
    const uint8_t *message, size_t length)
 {
    error_t error;
@@ -567,10 +594,10 @@ error_t sshParseKexEcdhMessage(SshConnection *connection, uint8_t type,
    if(connection->context->mode == SSH_OPERATION_MODE_CLIENT)
    {
       //Check message type
-      if(type == SSH_MSG_KEX_ECDH_REPLY)
+      if(type == SSH_MSG_KEX_KEM_REPLY)
       {
-         //Parse SSH_MSG_KEX_ECDH_REPLY message
-         error = sshParseKexEcdhReply(connection, message, length);
+         //Parse SSH_MSG_KEX_KEM_REPLY message
+         error = sshParseKexKemReply(connection, message, length);
       }
       else
       {
@@ -585,10 +612,10 @@ error_t sshParseKexEcdhMessage(SshConnection *connection, uint8_t type,
    if(connection->context->mode == SSH_OPERATION_MODE_SERVER)
    {
       //Check message type
-      if(type == SSH_MSG_KEX_ECDH_INIT)
+      if(type == SSH_MSG_KEX_KEM_INIT)
       {
-         //Parse SSH_MSG_KEX_ECDH_INIT message
-         error = sshParseKexEcdhInit(connection, message, length);
+         //Parse SSH_MSG_KEX_KEM_INIT message
+         error = sshParseKexKemInit(connection, message, length);
       }
       else
       {
@@ -610,208 +637,55 @@ error_t sshParseKexEcdhMessage(SshConnection *connection, uint8_t type,
 
 
 /**
- * @brief Select ECDH domain parameters
+ * @brief Select key encapsulation mechanism
  * @param[in] connection Pointer to the SSH connection
  * @return Error code
  **/
 
-error_t sshSelectEcdhCurve(SshConnection *connection)
+error_t sshSelectKemAlgo(SshConnection *connection)
 {
    error_t error;
-   const EcCurve *curve;
 
-#if (SSH_NISTP256_SUPPORT == ENABLED)
-   //NIST P-256 elliptic curve?
-   if(sshCompareAlgo(connection->kexAlgo, "ecdh-sha2-nistp256"))
-   {
-      curve = SECP256R1_CURVE;
-   }
-   else
-#endif
-#if (SSH_NISTP384_SUPPORT == ENABLED)
-   //NIST P-384 elliptic curve?
-   if(sshCompareAlgo(connection->kexAlgo, "ecdh-sha2-nistp384"))
-   {
-      curve = SECP384R1_CURVE;
-   }
-   else
-#endif
-#if (SSH_NISTP521_SUPPORT == ENABLED)
-   //NIST P-521 elliptic curve?
-   if(sshCompareAlgo(connection->kexAlgo, "ecdh-sha2-nistp521"))
-   {
-      curve = SECP521R1_CURVE;
-   }
-   else
-#endif
-#if (SSH_CURVE25519_SUPPORT == ENABLED)
-   //Curve25519 elliptic curve?
-   if(sshCompareAlgo(connection->kexAlgo, "curve25519-sha256") ||
-      sshCompareAlgo(connection->kexAlgo, "curve25519-sha256@libssh.org"))
-   {
-      curve = X25519_CURVE;
-   }
-   else
-#endif
-#if (SSH_CURVE448_SUPPORT == ENABLED)
-   //Curve448 elliptic curve?
-   if(sshCompareAlgo(connection->kexAlgo, "curve448-sha512"))
-   {
-      curve = X448_CURVE;
-   }
-   else
-#endif
-   //Unknown elliptic curve?
-   {
-      curve = NULL;
-   }
+   //Release KEM context
+   kemFree(&connection->kemContext);
 
-   //Make sure the specified elliptic curve is supported
-   if(curve != NULL)
+#if (SSH_MLKEM512_SUPPORT == ENABLED)
+   //ML-KEM-512 key encapsulation mechanism?
+   if(sshCompareAlgo(connection->kexAlgo, "mlkem512-sha256"))
    {
-      //Save ECDH domain parameters
-      error = ecdhSetCurve(&connection->ecdhContext, curve);
+      //Initialize KEM context
+      kemInit(&connection->kemContext, MLKEM512_KEM_ALGO);
+      //Successful processing
+      error = NO_ERROR;
    }
    else
+#endif
+#if (SSH_MLKEM768_SUPPORT == ENABLED)
+   //ML-KEM-768 key encapsulation mechanism?
+   if(sshCompareAlgo(connection->kexAlgo, "mlkem768-sha256"))
+   {
+      //Initialize KEM context
+      kemInit(&connection->kemContext, MLKEM768_KEM_ALGO);
+      //Successful processing
+      error = NO_ERROR;
+   }
+   else
+#endif
+#if (SSH_MLKEM1024_SUPPORT == ENABLED)
+   //ML-KEM-1024 key encapsulation mechanism?
+   if(sshCompareAlgo(connection->kexAlgo, "mlkem1024-sha384"))
+   {
+      //Initialize KEM context
+      kemInit(&connection->kemContext, MLKEM1024_KEM_ALGO);
+      //Successful processing
+      error = NO_ERROR;
+   }
+   else
+#endif
+   //Unknown key encapsulation mechanism?
    {
       //Report an error
       error = ERROR_UNSUPPORTED_KEY_EXCH_ALGO;
-   }
-
-   //Return status code
-   return error;
-}
-
-
-/**
- * @brief ECDH key pair generation
- * @param[in] connection Pointer to the SSH connection
- * @return Error code
- **/
-
-error_t sshGenerateEcdhKeyPair(SshConnection *connection)
-{
-   error_t error;
-   SshContext *context;
-
-   //Point to the SSH context
-   context = connection->context;
-
-#if (SSH_ECDH_CALLBACK_SUPPORT == ENABLED)
-   //Valid ECDH key pair generation callback function?
-   if(context->ecdhKeyPairGenCallback != NULL)
-   {
-      //Invoke user-defined callback
-      error = context->ecdhKeyPairGenCallback(connection, connection->kexAlgo,
-         &connection->ecdhContext.da.q);
-   }
-   else
-#endif
-   {
-      //No callback function registered
-      error = ERROR_UNSUPPORTED_KEY_EXCH_ALGO;
-   }
-
-   //Check status code
-   if(error == ERROR_UNSUPPORTED_KEY_EXCH_ALGO)
-   {
-      //Generate an ephemeral key pair
-      error = ecdhGenerateKeyPair(&connection->ecdhContext, context->prngAlgo,
-         context->prngContext);
-   }
-
-   //Return status code
-   return error;
-}
-
-
-/**
- * @brief ECDH shared secret calculation
- * @param[in] connection Pointer to the SSH connection
- * @return Error code
- **/
-
-error_t sshComputeEcdhSharedSecret(SshConnection *connection)
-{
-   error_t error;
-
-#if (SSH_ECDH_CALLBACK_SUPPORT == ENABLED)
-   //Valid ECDH shared secret calculation callback function?
-   if(connection->context->ecdhSharedSecretCalcCallback != NULL)
-   {
-      //Invoke user-defined callback
-      error = connection->context->ecdhSharedSecretCalcCallback(connection,
-         connection->kexAlgo, &connection->ecdhContext.qb, connection->k,
-         &connection->kLen);
-   }
-   else
-#endif
-   {
-      //No callback function registered
-      error = ERROR_UNSUPPORTED_KEY_EXCH_ALGO;
-   }
-
-   //Check status code
-   if(error == ERROR_UNSUPPORTED_KEY_EXCH_ALGO)
-   {
-      //Compute the shared secret K
-      error = ecdhComputeSharedSecret(&connection->ecdhContext, connection->k,
-         SSH_MAX_SHARED_SECRET_LEN - SSH_MAX_MPINT_OVERHEAD, &connection->kLen);
-   }
-
-   //Check status code
-   if(!error)
-   {
-      //Log shared secret (for debugging purpose only)
-      sshDumpKey(connection, "SHARED_SECRET", connection->k, connection->kLen);
-
-      //Convert the shared secret K to mpint representation
-      error = sshConvertArrayToMpint(connection->k, connection->kLen,
-         connection->k, &connection->kLen);
-   }
-
-   //Return status code
-   return error;
-}
-
-
-/**
- * @brief Update exchange hash with client's ephemeral public key
- * @param[in] connection Pointer to the SSH connection
- * @return Error code
- **/
-
-error_t sshDigestClientEcdhPublicKey(SshConnection *connection)
-{
-   error_t error;
-   size_t n;
-   uint8_t *buffer;
-
-   //Allocate a temporary buffer
-   buffer = sshAllocMem(SSH_BUFFER_SIZE);
-
-   //Successful memory allocation?
-   if(buffer != NULL)
-   {
-      //Format client's ephemeral public key
-      error = ecdhExportPublicKey(&connection->ecdhContext, buffer, &n,
-         EC_PUBLIC_KEY_FORMAT_X963);
-
-      //Check status code
-      if(!error)
-      {
-         //Update exchange hash H with Q_C (client's ephemeral public key
-         //octet string)
-         error = sshUpdateExchangeHash(connection, buffer, n);
-      }
-
-      //Release previously allocated memory
-      sshFreeMem(buffer);
-   }
-   else
-   {
-      //Failed to allocate memory
-      error = ERROR_OUT_OF_MEMORY;
    }
 
    //Return status code

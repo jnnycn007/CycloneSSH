@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.2
+ * @version 2.6.4
  **/
 
 #ifndef _SSH_KEY_EXPORT_H
@@ -37,6 +37,7 @@
 #include "pkc/dsa.h"
 #include "ecc/ec.h"
 #include "ecc/eddsa.h"
+#include "pqc/mldsa.h"
 
 //C++ guard
 #ifdef __cplusplus
@@ -81,6 +82,9 @@ error_t sshExportEd25519PublicKey(const EddsaPublicKey *publicKey,
    char_t *output, size_t *written, SshPublicKeyFormat format);
 
 error_t sshExportEd448PublicKey(const EddsaPublicKey *publicKey,
+   char_t *output, size_t *written, SshPublicKeyFormat format);
+
+error_t sshExportMldsaPublicKey(const MldsaPublicKey *publicKey,
    char_t *output, size_t *written, SshPublicKeyFormat format);
 
 error_t sshExportRsaPrivateKey(const RsaPrivateKey *privateKey,

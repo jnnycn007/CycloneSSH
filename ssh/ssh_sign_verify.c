@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.2
+ * @version 2.6.4
  **/
 
 //Switch to the appropriate trace level
@@ -720,7 +720,7 @@ error_t sshVerifyEd25519Signature(const SshString *publicKeyAlgo,
       if(!error)
       {
          //The Ed25519 public key consists of 32 octets
-         ed25519PublicKey = hostKey.q.value;
+         ed25519PublicKey = hostKey.key.value;
       }
    }
 
@@ -827,7 +827,7 @@ error_t sshVerifyEd448Signature(const SshString *publicKeyAlgo,
       if(!error)
       {
          //The Ed448 public key consists of 57 octets
-         ed448PublicKey = hostKey.q.value;
+         ed448PublicKey = hostKey.key.value;
       }
    }
 

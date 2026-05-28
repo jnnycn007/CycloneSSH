@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.2
+ * @version 2.6.4
  **/
 
 //Switch to the appropriate trace level
@@ -276,6 +276,74 @@ error_t sshExportEd448PublicKey(const EddsaPublicKey *publicKey,
 
    //Convert the host key structure to the desired format
    error = sshEncodePublicKeyFile("ssh-ed448", output, n, output, &n, format);
+   //Any error to report?
+   if(error)
+      return error;
+
+   //Total number of bytes that have been written
+   *written = n;
+
+   //Successful processing
+   return NO_ERROR;
+#else
+   //Not implemented
+   return ERROR_NOT_IMPLEMENTED;
+#endif
+}
+
+
+/**
+ * @brief Export a ML-DSA public key to SSH public key file format
+ * @param[in] publicKey ML-DSA public key
+ * @param[out] output Buffer where to store the SSH public key file (optional parameter)
+ * @param[out] written Length of the resulting SSH public key file
+ * @param[in] format Desired output format (SSH2 or OpenSSH format)
+ * @return Error code
+ **/
+
+error_t sshExportMldsaPublicKey(const MldsaPublicKey *publicKey,
+   char_t *output, size_t *written, SshPublicKeyFormat format)
+{
+#if (SSH_MLDSA44_SIGN_SUPPORT == ENABLED || SSH_MLDSA65_SIGN_SUPPORT == ENABLED || \
+   SSH_MLDSA87_SIGN_SUPPORT == ENABLED)
+   error_t error;
+   size_t n;
+   const char_t *keyFormatId;
+
+   //Check parameters
+   if(publicKey == NULL || written == NULL)
+      return ERROR_INVALID_PARAMETER;
+
+   //Check security level
+   if(publicKey->level == MLDSA44_SECURITY_LEVEL)
+   {
+      //Select ML-DSA-44 parameter set
+      keyFormatId = "ssh-mldsa-44";
+   }
+   else if(publicKey->level == MLDSA65_SECURITY_LEVEL)
+   {
+      //Select ML-DSA-65 parameter set
+      keyFormatId = "ssh-mldsa-65";
+   }
+   else if(publicKey->level == MLDSA87_SECURITY_LEVEL)
+   {
+      //Select ML-DSA-87 parameter set
+      keyFormatId = "ssh-mldsa-87";
+   }
+   else
+   {
+      //Invalid security level
+      return ERROR_INVALID_KEY;
+   }
+
+   //Format ML-DSA host key structure
+   error = sshFormatMldsaPublicKey(publicKey, (uint8_t *) output, &n);
+   //Any error to report?
+   if(error)
+      return error;
+
+   //Convert the host key structure to the desired format
+   error = sshEncodePublicKeyFile(keyFormatId, output, n, output, &n, format);
    //Any error to report?
    if(error)
       return error;

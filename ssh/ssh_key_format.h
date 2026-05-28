@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.6.2
+ * @version 2.6.4
  **/
 
 #ifndef _SSH_KEY_FORMAT_H
@@ -37,6 +37,7 @@
 #include "pkc/dsa.h"
 #include "ecc/ec.h"
 #include "ecc/eddsa.h"
+#include "pqc/mldsa.h"
 
 //Helper macro
 #define SSH_INC_POINTER(p, n) ((p != NULL) ? (p + n) : NULL)
@@ -60,6 +61,9 @@ error_t sshFormatEd25519PublicKey(const EddsaPublicKey *publicKey,
    uint8_t *p, size_t *written);
 
 error_t sshFormatEd448PublicKey(const EddsaPublicKey *publicKey,
+   uint8_t *p, size_t *written);
+
+error_t sshFormatMldsaPublicKey(const MldsaPublicKey *publicKey,
    uint8_t *p, size_t *written);
 
 error_t sshFormatOpenSshPrivateKeyHeader(uint8_t *p, size_t *written);
